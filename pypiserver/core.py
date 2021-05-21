@@ -206,6 +206,7 @@ class PkgFile(object):
                  'pkgname',
                  'version',
                  'parsed_version',
+                 '_requires_python',
                  'replaces']
 
     def __init__(self, pkgname, version, fn=None, root=None, relfn=None, replaces=None):
@@ -234,6 +235,41 @@ class PkgFile(object):
             else:
                 self._fname_and_hash = self.relfn_unix
         return self._fname_and_hash
+
+    def requires_python(self):
+        if not hasattr(self, '_requires_python'):
+            self._requires_python = requires_python(self.fn)
+        return self._requires_python
+
+
+def _requires_python(fpath):
+    import tarfile
+    from email.parser import Parser
+    from zipfile import ZipFile, BadZipFile
+    pkg_name, pkg_version = guess_pkgname_and_version(fpath)
+    if fpath.endswith(".zip") or fpath.endswith(".whl"):
+        try:
+            with ZipFile(fpath, 'r') as pkg:
+                if fpath.endswith(".whl"):
+                    pkg_info = "-".join([pkg_name, pkg_version]) + ".dist-info/METADATA"
+                else:
+                    pkg_info = "-".join([pkg_name, pkg_version]) + "/PKG-INFO"
+                pkg_metadata = pkg.read(pkg_info).decode("utf-8")
+                parser = Parser()
+                metadata = parser.parsestr(pkg_metadata)
+                return metadata["Requires-Python"]
+        except Exception as e:
+            return ''
+    else:
+        try:
+            with tarfile.open(fpath, 'r') as pkg:
+                pkg_info = "-".join([pkg_name, pkg_version]) + "/PKG-INFO"
+                pkg_metadata = pkg.extractfile(pkg_info).read().decode("utf-8")
+                parser = Parser()
+                metadata = parser.parsestr(pkg_metadata)
+                return metadata["Requires-Python"]
+        except Exception as e:
+            return ''
 
 
 def _listdir(root):
@@ -346,6 +382,10 @@ try:
         # fpath must be absolute path
         return cache_manager.digest_file(fpath, hash_algo, _digest_file)
 
+    def requires_python(fpath):
+        return cache_manager.requires_python(fpath, _requires_python)
+
 except ImportError:
     listdir = _listdir
     digest_file = _digest_file
+    requires_python = _requires_python

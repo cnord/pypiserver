@@ -320,6 +320,7 @@ def simple(prefix=""):
             urljoin(
                 fp, "../../packages/%s" % f.fname_and_hash(config.hash_algo)
             ),
+            f.requires_python(),
         )
         for f in files
     ]
@@ -330,8 +331,12 @@ def simple(prefix=""):
         </head>
         <body>
             <h1>Links for {{prefix}}</h1>
-            % for file, href in links:
-                 <a href="{{href}}">{{file}}</a><br>
+            % for file, href, requires_python in links:
+                 <a href="{{href}}" \\\\
+                    % if requires_python:
+                        data-requires-python="{{requires_python}}" \\\\
+                    % end
+                    >{{file}}</a><br>
             % end
         </body>
     </html>
